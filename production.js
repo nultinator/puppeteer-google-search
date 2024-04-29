@@ -27,12 +27,13 @@ function getScrapeOpsURL(url, location) {
     return `https://proxy.scrapeops.io/v1/?${params.toString()}`
 }
 //scrape page, this is our main logic
-async function scrapePage(browser, query, pageNumber, location, retries=3) {
+async function scrapePage(browser, query, pageNumber, location, retries=3, num=100) {
+    
     let tries = 0;
     while (tries <= retries) {
         const page = await browser.newPage();
         try {            
-            const url = `https://www.google.com/search?q=${query}&start=${pageNumber * 10}`;
+            const url = `https://www.google.com/search?q=${query}&start=${pageNumber * num}&num=${num}`;
             const proxyUrl = getScrapeOpsURL(url, location);
             //set a long timeout, sometimes the server take awhile
             await page.goto(proxyUrl, { timeout: 300000 });
@@ -78,24 +79,28 @@ async function scrapePage(browser, query, pageNumber, location, retries=3) {
     throw new Error(`Max retries reached: ${tries}`);
 }
 //function to launch a browser and scrape each page concurrently
-async function concurrentScrape(query, totalPages, location) {
+async function concurrentScrape(query, totalPages, location, num=10, retries=3) {
     const browser = await puppeteer.launch();
     const tasks = [];
     for (let i = 0; i < totalPages; i++) {
-        tasks.push(scrapePage(browser, query, i, location));
+        tasks.push(scrapePage(browser, query, i, location, retries, num));
     }
     await Promise.all(tasks);
     await browser.close();
 }
 //main function
 async function main() {
-    const query = 'cool stuff';
+    const queries = ['cool stuff'];
     const location = 'us';
     const totalPages = 3;
+    const batchSize = 20;
+    const retries = 5;
 
     console.log('Starting scrape...');
-    await concurrentScrape(query, totalPages, location)
-    console.log(`Scrape complete, results saved to: ${outputFile}`);
+    for (const query of queries) {
+        await concurrentScrape(query, totalPages, location, num=batchSize, retries);
+        console.log(`Scrape complete, results saved to: ${outputFile}`);
+    }
 };
 //run the main function
 main();
